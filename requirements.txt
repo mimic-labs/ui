@@ -2,6 +2,6 @@ numpy
 opencv-python-headless
 pillow
 streamlit
-streamlit-drawable-canvas
+git+https://github.com/jackhhao/streamlit-drawable-canvas.git@develop
 streamlit-extras
 streamlit-image-coordinates
