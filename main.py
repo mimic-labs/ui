@@ -11,7 +11,7 @@ st.title('Interactive Object Manipulation')
 
 global_render = st.empty() # test 'container' for outside-of-widget rendering
 
-# Helper function to initialize session state if not already present
+# helper function to initialize session state if not already present
 def init_session_state():
     defaults = {
         'image': None,
@@ -31,23 +31,35 @@ def init_session_state():
         st.session_state[key] = value
     print("init session state")
 
+# resize image to fit to screen
+def resize_img(img: Image.Image, max_size: int = 512) -> Image.Image:
+    if max(img.size) > max_size:
+        scale_factor = max_size / max(img.size)
+        new_size = (int(img.width * scale_factor), int(img.height * scale_factor))
+        img = img.resize(new_size)
+    return img
+
+# upload image & save to state
+# TODO: fix intermittent 'MediaFileHandler: Missing file' error
 def process_img_upload():
     print("changed file")
     file = st.session_state.get('img_file', None)
     if file is not None:
-        img = Image.open(file)
+        raw = Image.open(file)
+        img = resize_img(raw)
         print()
         if st.session_state.get('original_image', None) is None:
             print(f'{st.session_state.get('original_image', None)=}')
+            st.session_state['base_dims'] = raw.size
             st.session_state['original_image'] = img
             st.session_state['image'] = img
             print(f'setting image at {datetime.datetime.now()}')
     else:
         st.session_state['image'] = st.session_state['original_image'] = None
 
-# Function to handle image upload
+# function to handle image upload
 def upload_image():
-    st.session_state['rand'] = st.file_uploader('Upload an image', type=['png', 'jpg', 'jpeg'], key='img_file', on_change=process_img_upload)
+    st.file_uploader('Upload an image', type=['png', 'jpg', 'jpeg'], key='img_file', on_change=process_img_upload)
 
     if st.session_state.get('image', None) is not None:
         st.sidebar.image(st.session_state['image'], caption='Preview of image', use_column_width=True) # or st.session_state['image']
@@ -55,7 +67,7 @@ def upload_image():
 def set_action_active():
     st.session_state['done'] = False
 
-# Function to handle action selection
+# function to handle action selection
 def select_action():
     actions = ['Pick object up', 'Sweep', 'Place object down']
     st.selectbox(
@@ -66,7 +78,16 @@ def select_action():
         key='action',
     )
 
-# Function to handle hand selection based on the current action
+def scale_canvas_coords(x: float, y: float) -> tuple:
+    curr_dims = st.session_state['image'].size
+    base_dims = st.session_state['base_dims']
+    
+    x_scaled = x * base_dims[0] / curr_dims[0]
+    y_scaled = y * base_dims[1] / curr_dims[1]
+    
+    return x_scaled, y_scaled
+
+# function to handle hand selection based on the current action
 def handle_hand_selection():
     if st.session_state['action'] == 'Pick object up':
         if not (st.session_state['holding_left_hand'] and st.session_state['holding_right_hand']):
@@ -77,7 +98,7 @@ def handle_hand_selection():
                 hand_options.append('Right Hand')
                 
             st.session_state['hand_choice'] = st.radio('Choose hand to pick up object', hand_options)
-        else: # TODO: don't render rest of the form if invalid state
+        else: # tODO: don't render rest of the form if invalid state
             st.warning('Both hands are holding objects already.')
             # reset_form() # doesn't work since 'action' key cannot be manually set
             # st.session_state['done'] = True # will instantly remove all warnings/toasts/etc. too fast
@@ -91,7 +112,7 @@ def handle_hand_selection():
                 hand_options.append('Right Hand')
                 
             st.session_state['hand_choice'] = st.radio('Choose hand to place object', hand_options)
-        else: # TODO: don't render rest of the form if invalid state
+        else: # tODO: don't render rest of the form if invalid state
             st.warning('Both hands are empty. You need to pick up an object first.')
 
 def handle_pick_action():
@@ -106,13 +127,13 @@ def handle_pick_action():
         select_contact_points()
     # st.session_state['action'] = None
 
-# Function to handle object annotation
+# function to handle object annotation
 def select_mask():
     st.write('Click on points to identify the object. Press submit to confirm.')
     img = st.session_state['image']
 
     canvas_result = st_canvas(
-        fill_color='rgba(255, 165, 0, 0.3)',  # Color for object mask
+        fill_color='rgba(255, 165, 0, 0.3)',  # color for object mask
         stroke_width=3,
         background_image=img,
         update_streamlit=True,
@@ -129,6 +150,8 @@ def select_mask():
                 cx = obj['left'] + obj['radius']
                 cy = obj['top'] + obj['radius']
                 
+                cx, cy = scale_canvas_coords(cx, cy)
+                
                 if (cx, cy) not in st.session_state['object_points']:
                     st.session_state['object_points'].add((cx, cy))
 
@@ -143,7 +166,7 @@ def handle_mask_submit(img: Image.Image):
     
     st.session_state['history'].append('Object mask submitted.')
 
-    mask = get_mask(img, st.session_state['object_points']) # TODO: send this to backend instead
+    mask = get_mask(img, st.session_state['object_points']) # tODO: send this to backend instead
     img_with_mask = mask_color_img(img, mask)
     st.session_state['image'] = img_with_mask
     # st.session_state['image'].show()
@@ -151,7 +174,7 @@ def handle_mask_submit(img: Image.Image):
     st.session_state['mask_submitted'] = True
     # st.rerun()
 
-# Function to handle contact point annotation for object interaction
+# function to handle contact point annotation for object interaction
 def select_contact_points():
     st.write('Now, select contact points for hand grasping.')
     img: Image.Image = st.session_state['image']
@@ -159,7 +182,7 @@ def select_contact_points():
     # img.show()
 
     contact_canvas = st_canvas(
-        fill_color='rgba(0, 255, 0, 0.3)',  # Color for contact points
+        fill_color='rgba(0, 255, 0, 0.3)',  # color for contact points
         stroke_width=3,
         background_image=img,
         update_streamlit=True,
@@ -176,6 +199,8 @@ def select_contact_points():
                 cx = obj['left'] + obj['radius']
                 cy = obj['top'] + obj['radius']
                 
+                cx, cy = scale_canvas_coords(cx, cy)
+                
                 if (cx, cy) not in st.session_state['contact_points']:
                     st.session_state['contact_points'].add((cx, cy))
 
@@ -188,7 +213,7 @@ def handle_contact_point_submit():
     # st.write('Contact points submitted.')
 
     # st.session_state['image'] = 
-    print('Contact points (for backend): ', st.session_state['contact_points']) # TODO: send this to backend
+    print('Contact points (for backend): ', st.session_state['contact_points']) # tODO: send this to backend
 
     st.session_state['history'].append('Contact points submitted.')
 
@@ -199,14 +224,14 @@ def handle_contact_point_submit():
     # st.session_state['action_set'] = None
     # st.rerun()
 
-# Function to update the hand state after object interactions
+# function to update the hand state after object interactions
 def update_hand_state():
     if st.session_state['hand_choice'] == 'Left Hand':
         st.session_state['holding_left_hand'] = not st.session_state['holding_left_hand']
     elif st.session_state['hand_choice'] == 'Right Hand':
         st.session_state['holding_right_hand'] = not st.session_state['holding_right_hand']
     
-# Function to reset object and contact points
+# function to reset object and contact points
 def reset_form():
     st.session_state['object_points'] = set()
     st.session_state['contact_points'] = set()
@@ -219,7 +244,7 @@ def reset_form():
     # st.session_state['image'] = st.session_state['original_image'] # if we want to reset the canvas after every action
     # st.rerun()
 
-# Function to handle sweeping action
+# function to handle sweeping action
 def handle_sweep_action():
     img = st.session_state['image']
 
@@ -239,29 +264,30 @@ def handle_sweep_action():
         for obj in sweep_canvas.json_data['objects']:
             if 'path' in obj:
                 for command in obj['path']:
-                    # Skip the command letter and take the coordinates as pairs
+                    # skip the command letter and take the coordinates as pairs
                     coords = command[1:]
                     print(coords)
                     if len(coords) % 2 == 0:
-                        st.session_state['sweep_path'].extend([(coords[i], coords[i + 1]) for i in range(0, len(coords), 2)])
+                        coord_pairs = [scale_canvas_coords(coords[i], coords[i + 1]) for i in range(0, len(coords), 2)]
+                        st.session_state['sweep_path'].extend(coord_pairs)
     
         st.button('Submit Sweep Path', on_click=handle_sweep_submit, disabled=(len(st.session_state.get('sweep_path', [])) == 0))
             
 def handle_sweep_submit():
     # st.write('Sweep path submitted.')
-    print('Sweep Path: ', st.session_state['sweep_path']) # TODO: send this to backend
+    print('Sweep Path: ', st.session_state['sweep_path']) # tODO: send this to backend
     
     st.session_state['history'].append('Sweep path submitted.')
     
     st.session_state['done'] = True
     reset_form()
 
-# Function to handle placing object down
+# function to handle placing object down
 def handle_place_action():
     img = st.session_state['image']
     st.write('Click on points where the object should be placed.')
     place_canvas = st_canvas(
-        fill_color='rgba(255, 0, 0, 0.3)',  # Red for placing the object
+        fill_color='rgba(255, 0, 0, 0.3)',  # red for placing the object
         stroke_width=3,
         background_image=img,
         update_streamlit=True,
@@ -278,6 +304,8 @@ def handle_place_action():
                 cx = obj['left'] + obj['radius']
                 cy = obj['top'] + obj['radius']
                 
+                cx, cy = scale_canvas_coords(cx, cy)
+                
                 if (cx, cy) not in st.session_state['place_points']:
                     st.session_state['place_points'].add((cx, cy))
 
@@ -288,7 +316,7 @@ def handle_place_submit():
     # st.write('Place location submitted.')
 
     # st.session_state['image'] = 
-    print('Place points (for backend): ', st.session_state['place_points']) # TODO: send this to backend
+    print('Place points (for backend): ', st.session_state['place_points']) # tODO: send this to backend
 
     st.session_state['history'].append('Place location submitted.')
 
@@ -300,28 +328,28 @@ def reset_all():
     init_session_state()
     # print(st.session_state)
 
-# Main application flow
+# main application flow
 def main():
     if len(st.session_state) == 0:
         init_session_state()
     
-    # Step 1: Upload Image
+    # step 1: Upload Image
     upload_image()
     
-    # Reset button to clear session state
+    # reset button to clear session state
     st.button('Reset All', on_click=reset_all)
     
     if st.session_state['image']:
-        # Step 2: Select Action
+        # step 2: Select Action
         select_action()
 
         if st.session_state.get('action',None) and not st.session_state.get('done', True):
             print('Action selected: ', st.session_state['action'])
             # print(st.session_state)
-            # Step 3: Handle Hand Selection if necessary
+            # step 3: Handle Hand Selection if necessary
             handle_hand_selection()
 
-            # Step 4: Perform actions based on the selected action
+            # step 4: Perform actions based on the selected action
             if st.session_state['action'] == 'Pick object up':
                 handle_pick_action()
             elif st.session_state['action'] == 'Sweep':
@@ -332,14 +360,14 @@ def main():
                 # st.session_state['action'] = None
         
         with st.sidebar:
-            # TODO: persist these
+            # tODO: persist these
             st.write('Left Hand Holding: ', st.session_state['holding_left_hand'])
             st.write('Right Hand Holding: ', st.session_state['holding_right_hand'])
             
             for i,entry in enumerate(st.session_state['history']):
                 st.write(f'{i+1}. {entry}')
 
-# Masking function
+# masking function
 def mask_color_img(img: Image.Image, mask, color=[0, 0, 0], alpha=0.3) -> Image.Image:
     print('masking func')
     opencv_image = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
@@ -351,9 +379,9 @@ def mask_color_img(img: Image.Image, mask, color=[0, 0, 0], alpha=0.3) -> Image.
     return Image.fromarray(cv2.cvtColor(out, cv2.COLOR_BGR2RGB))
 
 # temp function to generate random rectangular 2d mask coordinates
-# TODO: fetch actual mask from backend
+# tODO: fetch actual mask from backend
 def get_mask(img: Image.Image, points: np.ndarray):
-    # Create a 2D mask for a grayscale image with False values initially
+    # create a 2D mask for a grayscale image with False values initially
     mask = np.zeros((img.height, img.width), dtype=bool)
 
     region_width = int(img.width * 0.2)
@@ -372,13 +400,13 @@ def get_mask(img: Image.Image, points: np.ndarray):
     end_x = min(start_x + region_width, img.width)
     end_y = min(start_y + region_height, img.height)
 
-    # Set the mask region to True within the selected rectangle
+    # set the mask region to True within the selected rectangle
     mask[start_y:end_y, start_x:end_x] = True
 
-    # Convert the 2D mask to match the 3-channel (RGB) image format
+    # convert the 2D mask to match the 3-channel (RGB) image format
     # return np.dstack([mask] * 3)
     return mask
 
-# Run the app
+# run the app
 if __name__ == '__main__':
     main()
