@@ -145,7 +145,7 @@ def select_mask():
     )
     print(canvas_result.json_data)
     if canvas_result.json_data is not None:
-        # st.session_state['object_points'] = set()
+        st.session_state['object_points'] = set()
         for obj in canvas_result.json_data['objects']:
             if obj['type'] == 'Circle':
                 cx = obj['left'] + obj['radius']
@@ -194,7 +194,7 @@ def select_contact_points():
     )
 
     if contact_canvas.json_data is not None:
-        # st.session_state['contact_points'] = set()
+        st.session_state['contact_points'] = set()
         for obj in contact_canvas.json_data['objects']:
             if obj['type'] == 'Circle':
                 cx = obj['left'] + obj['radius']
@@ -299,7 +299,7 @@ def handle_place_action():
     )
 
     if place_canvas.json_data is not None:
-        # st.session_state['place_points'] = set()
+        st.session_state['place_points'] = set()
         for obj in place_canvas.json_data['objects']:
             if obj['type'] == 'Circle':
                 cx = obj['left'] + obj['radius']
