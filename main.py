@@ -98,12 +98,11 @@ def handle_hand_selection():
                 hand_options.append('Right Hand')
                 
             st.session_state['hand_choice'] = st.radio('Choose hand to pick up object', hand_options)
-        else: # tODO: don't render rest of the form if invalid state
+        else: # TODO: don't render rest of the form if invalid state
             st.warning('Both hands are holding objects already.')
             # reset_form() # doesn't work since 'action' key cannot be manually set
             # st.session_state['done'] = True # will instantly remove all warnings/toasts/etc. too fast
-
-    if st.session_state['action'] == 'Place object down':
+    elif st.session_state['action'] == 'Place object down':
         if st.session_state['holding_left_hand'] or st.session_state['holding_right_hand']:
             hand_options = []
             if st.session_state['holding_left_hand']:
@@ -114,6 +113,8 @@ def handle_hand_selection():
             st.session_state['hand_choice'] = st.radio('Choose hand to place object', hand_options)
         else: # tODO: don't render rest of the form if invalid state
             st.warning('Both hands are empty. You need to pick up an object first.')
+    elif st.session_state['action'] == 'Sweep':
+        st.session_state['hand_choice'] = st.radio('Choose hand to place object', ['Left Hand', 'Right Hand'])
 
 def handle_pick_action():
     if not st.session_state.get('mask_submitted', False):
