@@ -165,7 +165,7 @@ def handle_mask_submit(img: Image.Image):
     print('Mask coordinates (for backend): ', mask_coordinates)
     print(f'{st.session_state['original_image']=}')
     
-    st.session_state['history'].append('Object mask submitted.')
+    # st.session_state['history'].append('Object mask submitted.')
 
     mask = get_mask(img, st.session_state['object_points']) # tODO: send this to backend instead
     img_with_mask = mask_color_img(img, mask)
@@ -216,9 +216,11 @@ def handle_contact_point_submit():
     # st.session_state['image'] = 
     print('Contact points (for backend): ', st.session_state['contact_points']) # tODO: send this to backend
 
-    st.session_state['history'].append('Contact points submitted.')
+    if st.session_state['action'] == 'Pick object up': # redundant for now, until we add addtl actions w/ contact points
+        hand = st.session_state['hand_choice']
+        st.session_state['history'].append(f"Pick up object with {hand}.")
 
-    update_hand_state()
+    toggle_hand_state()
     reset_form()
     # reset_all()
     st.session_state['done'] = True
@@ -226,7 +228,7 @@ def handle_contact_point_submit():
     # st.rerun()
 
 # function to update the hand state after object interactions
-def update_hand_state():
+def toggle_hand_state():
     if st.session_state['hand_choice'] == 'Left Hand':
         st.session_state['holding_left_hand'] = not st.session_state['holding_left_hand']
     elif st.session_state['hand_choice'] == 'Right Hand':
@@ -267,10 +269,11 @@ def handle_sweep_action():
                 for command in obj['path']:
                     # skip the command letter and take the coordinates as pairs
                     coords = command[1:]
-                    print(coords)
+                    
                     if len(coords) % 2 == 0:
                         coord_pairs = [scale_canvas_coords(coords[i], coords[i + 1]) for i in range(0, len(coords), 2)]
                         st.session_state['sweep_path'].extend(coord_pairs)
+                        # print(coord_pairs)
     
         st.button('Submit Sweep Path', on_click=handle_sweep_submit, disabled=(len(st.session_state.get('sweep_path', [])) == 0))
             
@@ -278,7 +281,8 @@ def handle_sweep_submit():
     # st.write('Sweep path submitted.')
     print('Sweep Path: ', st.session_state['sweep_path']) # tODO: send this to backend
     
-    st.session_state['history'].append('Sweep path submitted.')
+    hand = st.session_state['hand_choice']
+    st.session_state['history'].append(f"Sweep with {hand}.")
     
     st.session_state['done'] = True
     reset_form()
@@ -319,9 +323,10 @@ def handle_place_submit():
     # st.session_state['image'] = 
     print('Place points (for backend): ', st.session_state['place_points']) # tODO: send this to backend
 
-    st.session_state['history'].append('Place location submitted.')
+    hand = st.session_state['hand_choice']
+    st.session_state['history'].append(f"Place object in {hand} down.")
 
-    update_hand_state()
+    toggle_hand_state()
     reset_form()
     st.session_state['done'] = True
 
